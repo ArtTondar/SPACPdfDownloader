@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="BusinessLogicLayer/BusinessLogicLayer.csproj" />
+  <Project Path="Models/Models.csproj" />
+  <Project Path="PdfDownloader/PdfDownloader.csproj" />
+</Solution>
