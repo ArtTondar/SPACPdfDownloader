@@ -10,7 +10,7 @@ namespace Models
         public string? PrimaryUrl { get; set; }
         public string? FallbackUrl { get; set; }
         public int Year { get; set; }
-        public StatusMessage Status { get; set; } = StatusMessage.NotDownloaded;
+        public StatusMessage Status { get; set; }
         public string LocalPath { get; set; }
         public bool IsLocalFile { get; set; }
 
