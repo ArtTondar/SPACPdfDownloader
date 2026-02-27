@@ -14,7 +14,7 @@ namespace BusinessLogicLayer
 
         }
 
-        public List<Report> ReadFirstTwentyReports(string excelFilePath, string primaryColumn, string fallbackColumn)
+        public List<Report> ReadFirstTwentyReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn)
         {
             List<Report> reportList = new List<Report>();
 
@@ -22,13 +22,15 @@ namespace BusinessLogicLayer
             var sheet = workbook.Worksheet(1);
 
             int count = 0;
-            foreach (var row in sheet.RowsUsed().Skip(1)) // spring header over
+            foreach (var row in sheet.RowsUsed().Skip(1))
             {
+                string brNumber = row.Cell(idColumn).GetString();
                 string primaryUrl = row.Cell(primaryColumn).GetString();
                 string fallbackUrl = row.Cell(fallbackColumn).GetString();
 
                 var report = new Report()
                 {
+                    BRNumber = brNumber,
                     PrimaryUrl = string.IsNullOrWhiteSpace(primaryUrl) ? null : primaryUrl,
                     FallbackUrl = string.IsNullOrWhiteSpace(fallbackUrl) ? null : fallbackUrl,
                     Status = StatusMessage.NotDownloaded
@@ -37,7 +39,7 @@ namespace BusinessLogicLayer
                 reportList.Add(report);
 
                 count++;
-                if (count >= 20) break; // stop efter 10
+                if (count >= 20) break;
             }
 
             return reportList;
@@ -66,6 +68,75 @@ namespace BusinessLogicLayer
             }
 
             return reportList;
+        }
+
+        public bool ValidateInputFile(string path)
+        {
+            if (!IsValidPath(path)) return false;
+            if (!File.Exists(path)) return false;
+            if (IsFileLocked(path)) return false;
+
+            return true;
+        }
+
+        public bool ValidateOutputFile(string path)
+        {
+            if (!IsValidPath(path)) return false;
+            if (File.Exists(path) && IsFileLocked(path)) return false;
+            if (!CanWriteToFile(path)) return false;
+
+            return true;
+        }
+
+        public bool IsValidPath(string path)
+        {
+            try
+            {
+                Path.GetFullPath(path);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public bool IsFileLocked(string path)
+        {
+            try
+            {
+                using (FileStream stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.ReadWrite,
+                    FileShare.None))
+                {
+                    return false;
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+        }
+
+        public bool CanWriteToFile(string path)
+        {
+            try
+            {
+                using (FileStream fs = new FileStream(
+                    path,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None))
+                {
+                    return true;
+                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
         }
 
         public void WriteReports(List<Report> reports, string outputPath)
@@ -98,16 +169,23 @@ namespace BusinessLogicLayer
             workbook.SaveAs(outputPath);
         }
 
-        public bool ValidateColumns(string excelFilePath, string primaryColumn, string fallbackColumn)
+        public bool ValidateColumns(string excelFilePath, params string[] columns)
         {
             using var workbook = new XLWorkbook(excelFilePath);
             var sheet = workbook.Worksheet(1);
 
-            var headerRow = sheet.Row(1);
-            bool hasPrimary = headerRow.Cells().Any(c => c.Address.ColumnLetter == primaryColumn);
-            bool hasFallback = headerRow.Cells().Any(c => c.Address.ColumnLetter == fallbackColumn);
+            foreach (var column in columns)
+            {
+                var rows = sheet.RowsUsed().Skip(1);
 
-            return hasPrimary && hasFallback;
+                bool hasData = rows.Any(r =>
+                    !string.IsNullOrWhiteSpace(r.Cell(column).GetString()));
+
+                if (!hasData)
+                    return false;
+            }
+
+            return true;
         }
     }
 }

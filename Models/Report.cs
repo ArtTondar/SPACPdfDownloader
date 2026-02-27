@@ -6,7 +6,7 @@ namespace Models
 {
     public class Report
     {
-        public int BRNumber { get; set; }
+        public string BRNumber { get; set; }
         public string? PrimaryUrl { get; set; }
         public string? FallbackUrl { get; set; }
         public int Year { get; set; }
