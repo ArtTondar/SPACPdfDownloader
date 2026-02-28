@@ -9,9 +9,9 @@ namespace Models
         public string BRNumber { get; set; }
         public string? PrimaryUrl { get; set; }
         public string? FallbackUrl { get; set; }
-        public int Year { get; set; }
+        public int? Year { get; set; }
         public StatusMessage Status { get; set; }
-        public string LocalPath { get; set; }
+        public string? LocalPath { get; set; }
         public bool IsLocalFile { get; set; }
 
         //LastAttempt og RetryCount - resume/retry
@@ -20,7 +20,7 @@ namespace Models
 
         //Logging og statistik
         public double? FileSizeKB { get; set; }
-        public string Domain { get; set; }
+        public string? Domain { get; set; }
         public double? DownloadTimeSeconds { get; set; }
 
     }

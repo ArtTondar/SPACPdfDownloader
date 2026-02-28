@@ -1,51 +1,48 @@
 ﻿using BusinessLogicLayer;
 using Models;
 
-ExcelService excelService = new ExcelService();
+ExcelService es = new ExcelService();
+PdfDownloaderService ds = new PdfDownloaderService();
 
 // Hardcoded Excel-fil og kolonner - på sigt ændres til brugerinput
-string inputPath = @"C:\Users\Jannie\Downloads\GRI_2017_2020 (1).xlsx";
-string outputPath = @"C:\Users\Jannie\Downloads\TestExcelOutput2.xlsx";
+string excelInputPath = @"C:\pdf\GRI_2017_2020 (1).xlsx";
+string excelOutputPath = @"C:\pdf\ExcelOutput.xlsx";
+string pdfOutputPath = @"C:\pdf\downloaded_pdf_reports";
 string idColumn = "A"; // kolonne for BRNummer
 string primaryColumn = "AL";   // kolonne for PrimaryUrl
 string fallbackColumn = "AM";  // kolonne for FallbackUrl
+string yearColumn = "N"; // kolonne for publication year
 
-// 1️ Validate input file
-if (!excelService.ValidateInputFile(inputPath))
+// Validate excel input file
+if (!es.ValidateInputFile(excelInputPath))
 {
     Console.WriteLine("Input fil er ugyldig, findes ikke eller er låst.");
     return;
 }
 
-// 2️ Validate output file
-if (!excelService.ValidateOutputFile(outputPath))
+// Validate excel output file
+if (!es.ValidateOutputFile(excelOutputPath))
 {
     Console.WriteLine("Output fil er låst eller kan ikke skrives til.");
     return;
 }
 
-// 3️ Validate columns dynamically
+// Validate columns dynamically
 string[] requiredColumns = { primaryColumn, fallbackColumn };
-if (!excelService.ValidateColumns(inputPath, requiredColumns))
+if (!es.ValidateColumns(excelInputPath, requiredColumns))
 {
     Console.WriteLine("Input Excel mangler en eller flere nødvendige kolonner.");
     return;
 }
 
-// 4 Read reports
-List<Report> reports = excelService.ReadFirstTwentyReports(inputPath, idColumn, primaryColumn, fallbackColumn);
+// Read reports
+List<Report> reports = es.ReadReports(excelInputPath, idColumn, primaryColumn, fallbackColumn, yearColumn);
 Console.WriteLine($"Læst {reports.Count} rapporter.");
 
-// 5 Her kan downloades PDF'er, opdatere report.Status, LocalPath, FileSizeKB osv.
-foreach (var report in reports)
-{
-    //dummy data
-    report.Status = StatusMessage.Downloaded;
-    report.LocalPath = @"C:\Temp\Dummy.pdf";
-    report.FileSizeKB = 123;
-    report.DownloadTimeSeconds = 2.5;
-}
+// Download pdf's
+Console.WriteLine("Downloader pdf'er - dette kan godt tage lang tid...");
+await ds.DownloadReportsAsync(reports, pdfOutputPath);
 
-// 6️ Write reports to output
-excelService.WriteReports(reports, outputPath);
-Console.WriteLine($"Rapporter gemt til {outputPath}");
+// Write reports to output
+es.WriteReports(reports, excelOutputPath);
+Console.WriteLine($"Rapporter gemt til {excelOutputPath}");

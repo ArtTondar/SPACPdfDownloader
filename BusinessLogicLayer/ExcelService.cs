@@ -14,7 +14,7 @@ namespace BusinessLogicLayer
 
         }
 
-        public List<Report> ReadFirstTwentyReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn)
+        public List<Report> ReadFirstTwentyReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
         {
             List<Report> reportList = new List<Report>();
 
@@ -27,12 +27,16 @@ namespace BusinessLogicLayer
                 string brNumber = row.Cell(idColumn).GetString();
                 string primaryUrl = row.Cell(primaryColumn).GetString();
                 string fallbackUrl = row.Cell(fallbackColumn).GetString();
+                string yearString = row.Cell(yearColumn).GetString();
+
+                int.TryParse(yearString, out int year); // ?????????????
 
                 var report = new Report()
                 {
                     BRNumber = brNumber,
                     PrimaryUrl = string.IsNullOrWhiteSpace(primaryUrl) ? null : primaryUrl,
                     FallbackUrl = string.IsNullOrWhiteSpace(fallbackUrl) ? null : fallbackUrl,
+                    Year = year,
                     Status = StatusMessage.NotDownloaded
                 };
 
@@ -45,22 +49,29 @@ namespace BusinessLogicLayer
             return reportList;
         }
 
-        public List<Report> ReadReports(string excelFilePath, string primaryColumn, string fallbackColumn)
+        public List<Report> ReadReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
         {
             List<Report> reportList = new List<Report>();
 
             using var workbook = new XLWorkbook(excelFilePath);
             var sheet = workbook.Worksheet(1);
 
+            int count = 0;
             foreach (var row in sheet.RowsUsed().Skip(1))
             {
+                string brNumber = row.Cell(idColumn).GetString();
                 string primaryUrl = row.Cell(primaryColumn).GetString();
                 string fallbackUrl = row.Cell(fallbackColumn).GetString();
+                string yearString = row.Cell(yearColumn).GetString();
+
+                int.TryParse(yearString, out int year); // ?????????????
 
                 var report = new Report()
                 {
+                    BRNumber = brNumber,
                     PrimaryUrl = string.IsNullOrWhiteSpace(primaryUrl) ? null : primaryUrl,
                     FallbackUrl = string.IsNullOrWhiteSpace(fallbackUrl) ? null : fallbackUrl,
+                    Year = year,
                     Status = StatusMessage.NotDownloaded
                 };
 
