@@ -12,15 +12,9 @@ namespace Models
         public int Year { get; set; }
         public StatusMessage Status { get; set; }
         public string? LocalPath { get; set; }
-        public bool IsLocalFile { get; set; }
-
-        //LastAttempt og RetryCount - resume/retry
-        public DateTime? LastAttempt { get; set; }
-        public int RetryCount { get; set; }
 
         //Logging og statistik
         public double FileSizeKB { get; set; }
-        public string? Domain { get; set; }
         public double DownloadTimeSeconds { get; set; }
 
     }
