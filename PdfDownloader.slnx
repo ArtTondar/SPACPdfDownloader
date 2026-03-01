@@ -2,4 +2,5 @@
   <Project Path="BusinessLogicLayer/BusinessLogicLayer.csproj" />
   <Project Path="Models/Models.csproj" />
   <Project Path="PdfDownloader/PdfDownloader.csproj" />
+  <Project Path="Testing/Testing.csproj" Id="81aa22ca-4818-48a5-bdc8-0cfd46b02316" />
 </Solution>

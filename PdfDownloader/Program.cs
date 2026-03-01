@@ -2,7 +2,7 @@
 using Models;
 
 ExcelService es = new ExcelService();
-PdfDownloaderService ds = new PdfDownloaderService();
+PdfDownloaderService ds = new PdfDownloaderService(new HttpClient());
 
 // Hardcoded Excel-fil og kolonner - på sigt ændres til brugerinput
 string excelInputPath = @"C:\pdf\GRI_2017_2020 (1).xlsx";
@@ -36,7 +36,7 @@ if (!es.ValidateColumns(excelInputPath, requiredColumns))
 }
 
 // Read reports
-List<Report> reports = es.ReadReports(excelInputPath, idColumn, primaryColumn, fallbackColumn, yearColumn);
+List<Report> reports = es.ReadFirstTwoHundredReports(excelInputPath, idColumn, primaryColumn, fallbackColumn, yearColumn);
 Console.WriteLine($"Læst {reports.Count} rapporter.");
 
 // Download pdf's
