@@ -1,0 +1,63 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+' Program class
+class Program <<Main>> {
+}
+
+' ExcelService class
+class ExcelService {
+    +ReadFirstTwoHundredReports(excelFilePath, idColumn, primaryColumn, fallbackColumn, yearColumn) : List<Report>
+    +ReadFirstTwoHundredReports(excelStream, idColumn, primaryColumn, fallbackColumn, yearColumn) : List<Report>
+    +ReadReports(excelFilePath, idColumn, primaryColumn, fallbackColumn, yearColumn) : List<Report>
+    +ReadReports(excelStream, idColumn, primaryColumn, fallbackColumn, yearColumn) : List<Report>
+    +WriteReports(reports, outputPath)
+    +WriteReports(reports, stream)
+    +ValidateInputFile(path) : bool
+    +ValidateOutputFile(path) : bool
+    +IsValidPath(path) : bool
+    +IsFileLocked(path) : bool
+    +CanWriteToFile(path) : bool
+    +ValidateColumns(excelFilePath, columns) : bool
+    +ValidateColumns(excelStream, columns) : bool
+}
+
+' PdfDownloaderService class
+class PdfDownloaderService {
+    -HttpClient _httpClient
+    +DownloadReportsAsync(reports, outputFolder)
+    -ProcessSingleReportAsync(report, outputFolder)
+    -TryDownloadFromUrlsAsync(urls)
+    -DownloadPdfAsync(url)
+    -SaveFileAsync(report, fileBytes, outputFolder)
+    -LogHeartbeatIfNeeded(heartbeatTimer, totalStopwatch, processed, total, success, failed)
+    -LogFinalSummary(stopwatch, success, failed)
+}
+
+' Report class
+class Report {
+    -BRNumber : string
+    -PrimaryUrl : string
+    -FallbackUrl : string
+    -Year : int
+    -Status : StatusMessage
+    -LocalPath : string
+    -FileSizeKB : double
+    -DownloadTimeSeconds : double
+}
+
+' Enum StatusMessage
+enum StatusMessage {
+    NotDownloaded
+    Downloaded
+    Failed
+}
+
+' Relations
+Program --> ExcelService : <<uses>>
+Program --> PdfDownloaderService : <<uses>>
+ExcelService --> Report : "Creates & Writes"
+PdfDownloaderService --> Report : "Downloads / Updates"
+Report --> StatusMessage
+
+@enduml
