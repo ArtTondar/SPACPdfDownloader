@@ -9,6 +9,8 @@ namespace BusinessLogicLayer
 {
     /// <summary>
     /// Service til at læse og skrive rapporter fra/til Excel-filer.
+    /// Denne version bruger dynamiske kolonnenavne i stedet for hardcodede kolonnebogstaver.
+    /// Det gør det muligt at skifte inputfiler uden at ændre koden.
     /// </summary>
     public class ExcelService
     {
@@ -20,40 +22,68 @@ namespace BusinessLogicLayer
         }
 
         /// <summary>
-        /// Læser de første 200 rapporter fra en Excel-fil.
+        /// Finder kolonneindeks ud fra kolonneheader-navn i første række.
+        /// Returnerer null, hvis header ikke findes.
         /// </summary>
-        /// <param name="excelFilePath">Stien til Excel-filen.</param>
-        /// <param name="idColumn">Kolonne med BRNumber.</param>
-        /// <param name="primaryColumn">Kolonne med PrimaryUrl.</param>
-        /// <param name="fallbackColumn">Kolonne med FallbackUrl.</param>
-        /// <param name="yearColumn">Kolonne med årstal.</param>
-        /// <returns>Liste af op til 200 rapporter.</returns>
-        public List<Report> ReadFirstTwoHundredReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
+        private int? GetColumnIndexByHeader(IXLWorksheet sheet, string headerName)
+        {
+            var headerRow = sheet.Row(1);
+
+            // Loop gennem alle brugte celler i header-rækken for at finde kolonne
+            foreach (var cell in headerRow.CellsUsed())
+            {
+                // Trim og ignore case for at være robust overfor ekstra whitespace eller små/big letters
+                if (cell.GetString().Trim().Equals(headerName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return cell.Address.ColumnNumber; // Returnér 1-baseret kolonneindeks
+                }
+            }
+
+            return null; // kolonne ikke fundet
+        }
+
+        /// <summary>
+        /// Læser de første 200 rapporter fra en Excel-fil på disk.
+        /// </summary>
+        public List<Report> ReadFirstTwoHundredReports(string excelFilePath, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             using var stream = File.OpenRead(excelFilePath);
-            return ReadFirstTwoHundredReports(stream, idColumn, primaryColumn, fallbackColumn, yearColumn);
+            return ReadFirstTwoHundredReports(stream, idColumnName, primaryColumnName, fallbackColumnName, yearColumnName);
         }
 
         /// <summary>
         /// Læser de første 200 rapporter fra et Excel-stream.
         /// </summary>
-        public List<Report> ReadFirstTwoHundredReports(Stream excelStream, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
+        public List<Report> ReadFirstTwoHundredReports(Stream excelStream, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             List<Report> reportList = new List<Report>();
-
             using var workbook = new XLWorkbook(excelStream);
             var sheet = workbook.Worksheet(1);
 
+            // Find kolonneindeks dynamisk ud fra header-navne i stedet for hardcodede bogstaver
+            int? idCol = GetColumnIndexByHeader(sheet, idColumnName);
+            int? primaryCol = GetColumnIndexByHeader(sheet, primaryColumnName);
+            int? fallbackCol = GetColumnIndexByHeader(sheet, fallbackColumnName);
+            int? yearCol = string.IsNullOrWhiteSpace(yearColumnName) ? null : GetColumnIndexByHeader(sheet, yearColumnName);
+
+            // Tjek at alle nødvendige kolonner findes
+            if (!idCol.HasValue || !primaryCol.HasValue || !fallbackCol.HasValue)
+                throw new Exception("En af de nødvendige kolonner findes ikke i inputfilen.");
+
             int count = 0;
-            foreach (var row in sheet.RowsUsed().Skip(1)) // Spring header-række over
+
+            // Loop gennem alle brugte rækker i arket, spring header-række over
+            foreach (var row in sheet.RowsUsed().Skip(1))
             {
-                string brNumber = row.Cell(idColumn).GetString();
-                string primaryUrl = row.Cell(primaryColumn).GetString();
-                string fallbackUrl = row.Cell(fallbackColumn).GetString();
-                string yearString = row.Cell(yearColumn).GetString();
+                string brNumber = row.Cell(idCol.Value).GetString();
+                string primaryUrl = row.Cell(primaryCol.Value).GetString();
+                string fallbackUrl = row.Cell(fallbackCol.Value).GetString();
+                string yearString = yearCol.HasValue ? row.Cell(yearCol.Value).GetString() : null;
 
-                int.TryParse(yearString, out int year); // Gem år, hvis muligt
+                // Brug TryParse for at håndtere tomme eller ugyldige årstal
+                int.TryParse(yearString, out int year);
 
+                // Tilføj rapport til listen
                 reportList.Add(new Report
                 {
                     BRNumber = brNumber,
@@ -64,37 +94,46 @@ namespace BusinessLogicLayer
                 });
 
                 count++;
-                if (count >= 200) break; // Stop efter 200
+                if (count >= 200) break; // Stop efter 200 for prototype
             }
 
             return reportList;
         }
 
         /// <summary>
-        /// Læser alle rapporter fra en Excel-fil.
+        /// Læser alle rapporter fra en Excel-fil på disk.
         /// </summary>
-        public List<Report> ReadReports(string excelFilePath, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
+        public List<Report> ReadReports(string excelFilePath, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             using var stream = File.OpenRead(excelFilePath);
-            return ReadReports(stream, idColumn, primaryColumn, fallbackColumn, yearColumn);
+            return ReadReports(stream, idColumnName, primaryColumnName, fallbackColumnName, yearColumnName);
         }
 
         /// <summary>
         /// Læser alle rapporter fra et Excel-stream.
         /// </summary>
-        public List<Report> ReadReports(Stream excelStream, string idColumn, string primaryColumn, string fallbackColumn, string yearColumn)
+        public List<Report> ReadReports(Stream excelStream, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             List<Report> reportList = new List<Report>();
-
             using var workbook = new XLWorkbook(excelStream);
             var sheet = workbook.Worksheet(1);
 
+            // Find kolonneindeks dynamisk ud fra header-navne
+            int? idCol = GetColumnIndexByHeader(sheet, idColumnName);
+            int? primaryCol = GetColumnIndexByHeader(sheet, primaryColumnName);
+            int? fallbackCol = GetColumnIndexByHeader(sheet, fallbackColumnName);
+            int? yearCol = string.IsNullOrWhiteSpace(yearColumnName) ? null : GetColumnIndexByHeader(sheet, yearColumnName);
+
+            // Tjek at alle nødvendige kolonner findes
+            if (!idCol.HasValue || !primaryCol.HasValue || !fallbackCol.HasValue)
+                throw new Exception("En af de nødvendige kolonner findes ikke i inputfilen.");
+
             foreach (var row in sheet.RowsUsed().Skip(1))
             {
-                string brNumber = row.Cell(idColumn).GetString();
-                string primaryUrl = row.Cell(primaryColumn).GetString();
-                string fallbackUrl = row.Cell(fallbackColumn).GetString();
-                string yearString = row.Cell(yearColumn).GetString();
+                string brNumber = row.Cell(idCol.Value).GetString();
+                string primaryUrl = row.Cell(primaryCol.Value).GetString();
+                string fallbackUrl = row.Cell(fallbackCol.Value).GetString();
+                string yearString = yearCol.HasValue ? row.Cell(yearCol.Value).GetString() : null;
 
                 int.TryParse(yearString, out int year);
 
@@ -138,6 +177,7 @@ namespace BusinessLogicLayer
             sheet.Cell(1, 7).Value = "DownloadTimeSeconds";
 
             int row = 2;
+
             foreach (var report in reports)
             {
                 // Skriv data-rækker
@@ -214,7 +254,7 @@ namespace BusinessLogicLayer
         }
 
         /// <summary>
-        /// Tjekker om en fil kan åbnes til skrivning (Opretter fil hvis den ikke findes).
+        /// Tjekker om en fil kan åbnes til skrivning (opretter fil hvis den ikke findes).
         /// </summary>
         public bool CanWriteToFile(string path)
         {
@@ -232,10 +272,8 @@ namespace BusinessLogicLayer
         }
 
         /// <summary>
-        /// Validerer at angivne kolonner har data i Excel-filen.
+        /// Validerer at angivne kolonner har data i Excel-filen (header-navne i stedet for bogstaver).
         /// </summary>
-        /// <param name="excelFilePath">Sti til Excel-fil.</param>
-        /// <param name="columns">Liste af kolonner, f.eks. "A", "B".</param>
         public bool ValidateColumns(string excelFilePath, params string[] columns)
         {
             using var stream = File.OpenRead(excelFilePath);
@@ -244,17 +282,33 @@ namespace BusinessLogicLayer
 
         /// <summary>
         /// Validerer at angivne kolonner har data i Excel-stream.
+        /// Finder kolonneindeks dynamisk ud fra header-navn.
         /// </summary>
-        public bool ValidateColumns(Stream excelStream, params string[] columns)
+        public bool ValidateColumns(Stream excelStream, params string[] headerNames)
         {
             using var workbook = new XLWorkbook(excelStream);
             var sheet = workbook.Worksheet(1);
 
-            foreach (var column in columns)
+            var headerRow = sheet.Row(1);
+
+            foreach (var headerName in headerNames)
             {
-                // RowsUsed ignorerer tomme rækker, men vi tjekker data i alle brugte rækker
-                var rows = sheet.RowsUsed().Skip(1);
-                bool hasData = rows.Any(r => !string.IsNullOrWhiteSpace(r.Cell(column).GetString()));
+                // Find kolonne ud fra header-navn
+                var cell = headerRow.CellsUsed()
+                    .FirstOrDefault(c => c.GetString().Trim().Equals(headerName, StringComparison.OrdinalIgnoreCase));
+
+                if (cell == null)
+                {
+                    // Kolonnen findes ikke → validering fejler
+                    return false;
+                }
+
+                int colIndex = cell.Address.ColumnNumber;
+
+                // Tjek at der er data i kolonnen
+                bool hasData = sheet.RowsUsed().Skip(1)
+                    .Any(r => !string.IsNullOrWhiteSpace(r.Cell(colIndex).GetString()));
+
                 if (!hasData) return false;
             }
 
