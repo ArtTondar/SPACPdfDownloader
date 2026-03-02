@@ -1,48 +1,92 @@
 ﻿using BusinessLogicLayer;
 using Models;
+using Microsoft.Extensions.Configuration;
 
+// ------------------------------------------------------------
+// Læs konfiguration fra appsettings.json
+// ------------------------------------------------------------
+// ConfigurationBuilder henter værdier fra JSON-filen.
+// optional: false → programmet fejler, hvis filen ikke findes
+var config = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory()) // Base path = kørselens folder
+    .AddJsonFile("appsettings.json", optional: false)
+    .Build();
+
+// ------------------------------------------------------------
+// Opret services
+// ------------------------------------------------------------
+// ExcelService håndterer læsning og skrivning af Excel-filer
+// PdfDownloaderService håndterer PDF-downloads via HttpClient
 ExcelService es = new ExcelService();
 PdfDownloaderService ds = new PdfDownloaderService(new HttpClient());
 
-// Hardcoded Excel-fil og kolonner - på sigt ændres til brugerinput
-string excelInputPath = @"C:\pdf\GRI_2017_2020 (1).xlsx";
-string excelOutputPath = @"C:\pdf\ExcelOutput.xlsx";
-string pdfOutputPath = @"C:\pdf\downloaded_pdf_reports";
-string idColumn = "A"; // kolonne for BRNummer
-string primaryColumn = "AL";   // kolonne for PrimaryUrl
-string fallbackColumn = "AM";  // kolonne for FallbackUrl
-string yearColumn = "N"; // kolonne for publication year
+// ------------------------------------------------------------
+// Læs paths og kolonnenavne fra konfiguration
+// ------------------------------------------------------------
+string excelInputPath = config["ExcelInputPath"];
+string excelOutputPath = config["ExcelOutputPath"];
+string pdfOutputPath = config["PdfOutputPath"];
 
-// Validate excel input file
+// Kolonnenavne i header-rækken (ikke bogstaver)
+// Gør det muligt at skifte inputfiler uden at ændre koden
+string idColumn = config["Columns:BRNumber"];
+string primaryColumn = config["Columns:PrimaryUrl"];
+string fallbackColumn = config["Columns:FallbackUrl"];
+string yearColumn = config["Columns:Year"];
+
+// Maks antal samtidige downloads (dynamisk via JSON)
+int maxParallel = int.Parse(config["MaxParallelDownloads"]);
+
+// ------------------------------------------------------------
+// Valider input- og outputfiler
+// ------------------------------------------------------------
 if (!es.ValidateInputFile(excelInputPath))
 {
     Console.WriteLine("Input fil er ugyldig, findes ikke eller er låst.");
     return;
 }
 
-// Validate excel output file
 if (!es.ValidateOutputFile(excelOutputPath))
 {
     Console.WriteLine("Output fil er låst eller kan ikke skrives til.");
     return;
 }
 
-// Validate columns dynamically
-string[] requiredColumns = { primaryColumn, fallbackColumn };
+// ------------------------------------------------------------
+// Valider at nødvendige kolonner findes og har data
+// ------------------------------------------------------------
+string[] requiredColumns = { idColumn, primaryColumn, fallbackColumn };
 if (!es.ValidateColumns(excelInputPath, requiredColumns))
 {
     Console.WriteLine("Input Excel mangler en eller flere nødvendige kolonner.");
     return;
 }
 
-// Read reports
-List<Report> reports = es.ReadFirstTwoHundredReports(excelInputPath, idColumn, primaryColumn, fallbackColumn, yearColumn);
+// ------------------------------------------------------------
+// Læs rapporter fra Excel
+// ------------------------------------------------------------
+// Læs kun de første 200 rapporter i prototypen
+// Dette kan senere ændres til at læse alle (ReadReports)
+List<Report> reports = es.ReadFirstTwoHundredReports(
+    excelInputPath,
+    idColumn,
+    primaryColumn,
+    fallbackColumn,
+    yearColumn
+);
+
 Console.WriteLine($"Læst {reports.Count} rapporter.");
 
-// Download pdf's
+// ------------------------------------------------------------
+// Download PDF'er
+// ------------------------------------------------------------
+// Dynamisk antal samtidige downloads via maxParallel
+// DownloadReportsAsync håndterer automatisk fallback URLs og statusopdatering
 Console.WriteLine("Downloader pdf'er - dette kan godt tage lang tid...");
-await ds.DownloadReportsAsync(reports, pdfOutputPath);
+await ds.DownloadReportsAsync(reports, pdfOutputPath, maxParallel);
 
-// Write reports to output
+// ------------------------------------------------------------
+// Skriv rapporter tilbage til Excel
+// ------------------------------------------------------------
 es.WriteReports(reports, excelOutputPath);
 Console.WriteLine($"Rapporter gemt til {excelOutputPath}");

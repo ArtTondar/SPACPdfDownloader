@@ -7,9 +7,11 @@ using System.Diagnostics;
 public class PdfDownloaderService
 {
     private readonly HttpClient _httpClient;
+    private readonly object _heartbeatLock = new object();
 
     /// <summary>
     /// Initialiserer tjenesten med en HttpClient.
+    /// HttpClient bør genbruges for performance og for at undgå socket exhaustion.
     /// </summary>
     /// <param name="httpClient">HttpClient til download af filer.</param>
     public PdfDownloaderService(HttpClient httpClient)
@@ -22,12 +24,11 @@ public class PdfDownloaderService
     /// </summary>
     /// <param name="reports">Listen af rapporter, der skal downloades.</param>
     /// <param name="outputFolder">Sti til output-mappen, hvor PDF'er gemmes i undermapper pr. år.</param>
-    public async Task DownloadReportsAsync(List<Report> reports, string outputFolder)
+    /// <param name="maxParallel">Maks antal samtidige downloads (dynamisk parameter, fx fra JSON-konfiguration).</param>
+    public async Task DownloadReportsAsync(List<Report> reports, string outputFolder, int maxParallel)
     {
-        // Sørg for at output-folderen eksisterer
         Directory.CreateDirectory(outputFolder);
 
-        int maxParallel = 8; // Begræns antallet af samtidige downloads
         var semaphore = new SemaphoreSlim(maxParallel);
 
         int processed = 0;
@@ -35,16 +36,40 @@ public class PdfDownloaderService
         int failed = 0;
 
         var totalStopwatch = Stopwatch.StartNew();
-        var heartbeatTimer = Stopwatch.StartNew();
 
-        // Opret én Task pr. rapport, men begræns parallelitet via semaphore
-        var tasks = reports.Select(async report =>
+        // CancellationToken for heartbeat-timer
+        using var cts = new CancellationTokenSource();
+
+        // Start heartbeat logger
+        var heartbeatTask = Task.Run(async () =>
         {
-            await semaphore.WaitAsync();
-
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
             try
             {
-                // Download og gem fil; true = succes, false = fejl
+                while (await timer.WaitForNextTickAsync(cts.Token))
+                {
+                    if (processed == 0) continue;
+
+                    double avg = totalStopwatch.Elapsed.TotalSeconds / processed;
+                    double remaining = (reports.Count - processed) * avg;
+
+                    Console.WriteLine(
+                        $"[{DateTime.Now:HH:mm:ss}] " +
+                        $"Processed: {processed}/{reports.Count} | " +
+                        $"Success: {success} | Failed: {failed} | " +
+                        $"Elapsed: {totalStopwatch.Elapsed:hh\\:mm\\:ss} | " +
+                        $"ETA: {TimeSpan.FromSeconds(remaining):hh\\:mm\\:ss}");
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+
+        // Download tasks
+        var downloadTasks = reports.Select(async report =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
                 bool downloaded = await ProcessSingleReportAsync(report, outputFolder);
 
                 if (downloaded)
@@ -56,22 +81,16 @@ public class PdfDownloaderService
             {
                 Interlocked.Increment(ref processed);
                 semaphore.Release();
-
-                // Log progress med "heartbeat" hver 15 sekunder
-                LogHeartbeatIfNeeded(
-                    heartbeatTimer,
-                    totalStopwatch,
-                    processed,
-                    reports.Count,
-                    success,
-                    failed);
             }
         });
 
-        // Vent på alle downloads er færdige
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(downloadTasks);
 
-        totalStopwatch.Stop();
+        // Stop heartbeat-loop
+        cts.Cancel();
+        await heartbeatTask;
+
+        // Log slutstatus
         LogFinalSummary(totalStopwatch, success, failed);
     }
 
@@ -83,10 +102,15 @@ public class PdfDownloaderService
     /// <returns>True hvis download lykkedes, ellers false.</returns>
     private async Task<bool> ProcessSingleReportAsync(Report report, string outputFolder)
     {
+        var sw = Stopwatch.StartNew(); // Start tidtagning
+
         var urls = new[] { report.PrimaryUrl, report.FallbackUrl };
 
-        // Prøv alle URLs indtil download lykkes
         var fileBytes = await TryDownloadFromUrlsAsync(urls);
+
+        sw.Stop(); // Stop tidtagning
+
+        report.DownloadTimeSeconds = sw.Elapsed.TotalSeconds; // Gem downloadtid
 
         if (fileBytes == null)
         {
@@ -94,10 +118,8 @@ public class PdfDownloaderService
             return false;
         }
 
-        // Gem PDF på disk
         string fullPath = await SaveFileAsync(report, fileBytes, outputFolder);
 
-        // Opdater metadata i report-objektet
         report.LocalPath = fullPath;
         report.FileSizeKB = fileBytes.Length / 1024.0;
         report.Status = StatusMessage.Downloaded;
@@ -160,36 +182,9 @@ public class PdfDownloaderService
 
         string fullPath = Path.Combine(yearFolder, $"{report.BRNumber}.pdf");
 
-        await File.WriteAllBytesAsync(fullPath, fileBytes);
+        await File.WriteAllBytesAsync(fullPath, fileBytes); // Async skriv for performance
 
         return fullPath;
-    }
-
-    /// <summary>
-    /// Logger status (“heartbeat”) hvert 15. sekund med processed, success og failed counts.
-    /// </summary>
-    private void LogHeartbeatIfNeeded(
-        Stopwatch heartbeatTimer,
-        Stopwatch totalStopwatch,
-        int processed,
-        int total,
-        int success,
-        int failed)
-    {
-        if (heartbeatTimer.Elapsed.TotalSeconds < 15)
-            return;
-
-        double avg = totalStopwatch.Elapsed.TotalSeconds / processed;
-        double remaining = (total - processed) * avg;
-
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss}] " +
-            $"Processed: {processed}/{total} | " +
-            $"Success: {success} | Failed: {failed} | " +
-            $"Elapsed: {totalStopwatch.Elapsed:hh\\:mm\\:ss} | " +
-            $"ETA: {TimeSpan.FromSeconds(remaining):hh\\:mm\\:ss}");
-
-        heartbeatTimer.Restart();
     }
 
     /// <summary>
