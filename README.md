@@ -74,7 +74,7 @@ Hvis dette ikke er sat korrekt, vil konfigurationsindlæsning fejle ved runtime.
 
 ## Sådan køres projektet
 
-1. **Opdater variabler** i `appsettings.json`:
+1. Opdater variabler i `appsettings.json`:
    ```csharp
    "ExcelInputPath": "C:\\pdf\\GRI_2017_2020.xlsx",
    "ExcelOutputPath": "C:\\pdf\\ExcelOutput.xlsx",
@@ -104,7 +104,7 @@ Hvis dette ikke er sat korrekt, vil konfigurationsindlæsning fejle ved runtime.
 
 ---
 
-Logging
+## Logging
 
    - Under kørsel vises:
      - Processed / Total
@@ -123,6 +123,7 @@ Logging
 ---
 
 ## Noter
+
    - Download sker asynkront og parallelt
    - SemaphoreSlim begrænser antal samtidige downloads
    - Hvis PrimaryUrl fejler, forsøges automatisk FallbackUrl
@@ -132,7 +133,10 @@ Logging
 ---
 
 ## Fremtidige forbedringer
+
+   - Timeout på Http requests
    - ExcelOutputPath skal opdateres efter hver enkelt download i stedet for til sidst efter alle
    - Retry-strategi med eksponentiel backoff
    - Mulighed for at genoptage afbrudte downloads
    - Logging via ILogger i stedet for Console.WriteLine
+   - Docker containerization
