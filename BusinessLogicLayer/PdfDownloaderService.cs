@@ -20,39 +20,66 @@ public class PdfDownloaderService
     }
 
     /// <summary>
-    /// Downloader en liste af rapporter parallelt og gemmer dem i outputFolder.
+    /// Downloader en liste af rapporter parallelt og gemmer dem i den angivne output-mappe.
+    /// 
+    /// Metoden:
+    /// - Begrænser antal samtidige downloads via SemaphoreSlim
+    /// - Logger løbende fremdrift via PeriodicTimer (heartbeat)
+    /// - Måler samlet køretid
+    /// - Logger en samlet slutstatus når alle downloads er færdige
     /// </summary>
-    /// <param name="reports">Listen af rapporter, der skal downloades.</param>
-    /// <param name="outputFolder">Sti til output-mappen, hvor PDF'er gemmes i undermapper pr. år.</param>
-    /// <param name="maxParallel">Maks antal samtidige downloads (dynamisk parameter, fx fra JSON-konfiguration).</param>
+    /// <param name="reports">
+    /// Listen af rapporter der skal downloades.
+    /// Hver rapport opdateres (ønsket løbende) med status, filsti, filstørrelse og downloadtid.
+    /// </param>
+    /// <param name="outputFolder">
+    /// Sti til output-mappen, hvor PDF-filer gemmes i undermapper pr. år.
+    /// </param>
+    /// <param name="maxParallel">
+    /// Maksimalt antal samtidige downloads.
+    /// Bruges til at undgå overbelastning af netværk eller server.
+    /// </param>
     public async Task DownloadReportsAsync(List<Report> reports, string outputFolder, int maxParallel)
     {
+        // Sørg for at output-mappen eksisterer før download starter
         Directory.CreateDirectory(outputFolder);
 
+        // Semaphore bruges til at begrænse antal samtidige downloads
         var semaphore = new SemaphoreSlim(maxParallel);
 
-        int processed = 0;
-        int success = 0;
-        int failed = 0;
+        // Tællere opdateres trådsikkert via Interlocked
+        int processed = 0; // Antal færdigbehandlede rapporter (success + failed)
+        int success = 0;   // Antal succesfulde downloads
+        int failed = 0;    // Antal fejlede downloads
 
+        // Stopwatch måler samlet køretid for hele batchen
         var totalStopwatch = Stopwatch.StartNew();
 
-        // CancellationToken for heartbeat-timer
+        // CancellationToken bruges til at stoppe heartbeat-timeren,
+        // når alle downloads er færdige
         using var cts = new CancellationTokenSource();
 
-        // Start heartbeat logger
+        // Starter en baggrundsopgave, der logger fremdrift periodisk
         var heartbeatTask = Task.Run(async () =>
         {
+            // PeriodicTimer udløses hvert 3. sekund
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+
             try
             {
                 while (await timer.WaitForNextTickAsync(cts.Token))
                 {
-                    if (processed == 0) continue;
+                    // Undgå division med nul før første rapport er behandlet
+                    if (processed == 0)
+                        continue;
 
+                    // Beregn gennemsnitlig behandlingstid pr. rapport
                     double avg = totalStopwatch.Elapsed.TotalSeconds / processed;
+
+                    // Estimer resterende tid (ETA)
                     double remaining = (reports.Count - processed) * avg;
 
+                    // Log aktuel fremdrift
                     Console.WriteLine(
                         $"[{DateTime.Now:HH:mm:ss}] " +
                         $"Processed: {processed}/{reports.Count} | " +
@@ -61,17 +88,24 @@ public class PdfDownloaderService
                         $"ETA: {TimeSpan.FromSeconds(remaining):hh\\:mm\\:ss}");
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                // Forventet når vi stopper timeren efter afsluttet batch
+            }
         });
 
-        // Download tasks
+        // Opretter en asynkron opgave pr. rapport
         var downloadTasks = reports.Select(async report =>
         {
+            // Vent hvis maks. antal samtidige downloads er nået
             await semaphore.WaitAsync();
+
             try
             {
+                // Forsøg at downloade og gem rapporten
                 bool downloaded = await ProcessSingleReportAsync(report, outputFolder);
 
+                // Opdater succes/fejl-tællere trådsikkert
                 if (downloaded)
                     Interlocked.Increment(ref success);
                 else
@@ -79,18 +113,24 @@ public class PdfDownloaderService
             }
             finally
             {
+                // Marker rapport som behandlet
                 Interlocked.Increment(ref processed);
+
+                // Frigiv plads i semaphore, så en ny download kan starte
                 semaphore.Release();
             }
         });
 
+        // Vent på at alle downloads færdiggøres
         await Task.WhenAll(downloadTasks);
 
-        // Stop heartbeat-loop
+        // Stop heartbeat-logging
         cts.Cancel();
+
+        // Vent på at heartbeat-task afsluttes korrekt
         await heartbeatTask;
 
-        // Log slutstatus
+        // Log samlet slutstatus (total runtime + success/failed)
         LogFinalSummary(totalStopwatch, success, failed);
     }
 
