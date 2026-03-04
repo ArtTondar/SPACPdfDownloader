@@ -7,14 +7,17 @@ Projektet håndterer både primære og fallback URLs, og logger downloadstatus s
 
 ## Projektstruktur
 
-ProjectRoot/
-   Program.cs # Hovedprogrammet, starter processen
-   Models/
-     Report.cs # Report-klassen og StatusMessage enum
-   BusinessLogicLayer/
-     ExcelService.cs # Læser, skriver og validerer Excel-filer
-     PdfDownloaderService.cs # Downloader PDF-filer og logger status
-   README.md # Denne fil
+- ProjectRoot/
+   - Program.cs # Hovedprogrammet, starter processen
+   - appsettings.json
+   - README.md # Denne fil
+   
+   - Models/
+     - Report.cs # Report-klassen og StatusMessage enum
+     
+   - BusinessLogicLayer/
+     - ExcelService.cs # Læser, skriver og validerer Excel-filer
+     - PdfDownloaderService.cs # Downloader PDF-filer og logger status
 
 ---
 
@@ -27,18 +30,21 @@ ProjectRoot/
 
 - **PdfDownloaderService**
   - Downloader PDF-filer asynkront (`DownloadReportsAsync`)
-  - Håndterer både primære og fallback URLs
-  - Logger succes, fejl og tidsforbrug
+  - Begrænser parallelle downloads via SemaphoreSlim
+  - Logger progress hvert X sekund via PeriodicTimer
+  - Logger slutstatus med samlet runtime
+  - Måler downloadtid pr. rapport (`DownloadTimeSeconds`)
+  - Understøtter fallback URL hvis primær URL fejler
 
 - **Report**
-  - Indeholder metadata for hver rapport: BRNumber, URLs, Year, Status, LocalPath, filstørrelse og downloadtid
+  - Indeholder metadata for hver rapport: `BRNumber`, `PrimaryUrl`, `FallbackUrl`, `Year`, `Status`, `LocalPath`, `FileSizeKB`, `DownloadTimeSeconds`
   - StatusMessage enum: `NotDownloaded`, `Downloaded`, `Failed`
 
 - **Program.cs**
   - Starter applikationen
-  - Validerer input Excel og output-sti
-  - Læser de første 200 rapporter fra Excel
-  - Downloader PDF-filer
+  - Validerer input Excel og output-stier
+  - Læser rapporter fra Excel
+  - Starter parallel PDF-download
   - Gemmer opdaterede rapporter tilbage til Excel
 
 ---
@@ -52,17 +58,34 @@ ProjectRoot/
 
 ---
 
+## appsettings.json konfiguration
+
+Hvis projektet bruger appsettings.json, skal filen konfigureres korrekt i Visual Studio.
+VIGTIGT: Sørg for at filen kopieres til output-mappen
+   - Højreklik på appsettings.json
+   - Vælg Properties
+   - Sæt:
+     - Build Action = Content
+     - Copy to Output Directory = Copy if newer
+Når du bygger/kører projektet, kopieres filen automatisk til: bin\Debug\net6.0\
+Hvis dette ikke er sat korrekt, vil konfigurationsindlæsning fejle ved runtime.
+
+--- 
+
 ## Sådan køres projektet
 
-1. **Opdater hardcoded stier og kolonner** i `Program.cs`:
+1. **Opdater variabler** i `appsettings.json`:
    ```csharp
-   string excelInputPath = @"C:\pdf\GRI_2017_2020 (1).xlsx";
-   string excelOutputPath = @"C:\pdf\ExcelOutput.xlsx";
-   string pdfOutputPath = @"C:\pdf\downloaded_pdf_reports";
-   string idColumn = "A";
-   string primaryColumn = "AL";
-   string fallbackColumn = "AM";
-   string yearColumn = "N";
+   "ExcelInputPath": "C:\\pdf\\GRI_2017_2020.xlsx",
+   "ExcelOutputPath": "C:\\pdf\\ExcelOutput.xlsx",
+   "PdfOutputPath": "C:\\pdf\\downloaded_pdf_reports",
+   "Columns": {
+     "BRNumber": "BRnum", // Header i Excel for BRNumber
+     "PrimaryUrl": "Pdf_URL", // Header i Excel for PrimaryUrl
+     "FallbackUrl": "Report Html Address", // Header i Excel for FallbackUrl: null,
+     "Year": "Publication Year" // Header i Excel for Year (valgfri)
+   },
+   "MaxParallelDownloads": 10, // Hvor mange PDF'er der kan hentes samtidigt
 
 2. Build projektet i Visual Studio eller via CLI:
    dotnet build
@@ -71,19 +94,45 @@ ProjectRoot/
    dotnet run
 
 4. Output
-    Downloadede PDF-filer gemmes i pdfOutputPath
-    Opdateret Excel med status og lokal sti gemmes i excelOutputPath
+    - Downloadede PDF-filer gemmes i:
+      - PdfOutputPath\\{Year}\\{BRNumber}.pdf
+    - Den opdaterede Excel-fil indeholder:
+      - Status (Downloaded / Failed)
+      - Lokal filsti
+      - Filstørrelse i KB
+      - Downloadtid i sekunder
+
+---
+
+Logging
+
+   - Under kørsel vises:
+     - Processed / Total
+     - Success / Failed
+     - Elapsed time
+     - Estimeret resterende tid (ETA)
+
+   Heartbeat logges periodisk via PeriodicTimer.
+
+   - Når alle downloads er færdige, vises en samlet summary:
+      Download færdig.
+      Total tid: 00:12:34
+      Success: 180
+      Failed: 20
 
 ---
 
 ## Noter
-    Projektet håndterer op til de første 200 rapporter i Excel for hurtig testkørsel (ReadFirstTwoHundredReports).
-    Download sker asynkront og rapporterer løbende succes/fejl.
-    Hvis en PDF ikke kan downloades fra PrimaryUrl, forsøger systemet FallbackUrl.
-    Excel kolonner valideres før læsning for at undgå runtime-fejl.
+   - Download sker asynkront og parallelt
+   - SemaphoreSlim begrænser antal samtidige downloads
+   - Hvis PrimaryUrl fejler, forsøges automatisk FallbackUrl
+   - Excel-kolonner valideres før læsning
+   - Downloadtid måles pr. rapport
 
 ---
 
 ## Fremtidige forbedringer
-    Tilføj brugerinput til stier og kolonner i stedet for hardcoding.
-    Mulighed for at genoptage tidligere downloads.
+   - ExcelOutputPath skal opdateres efter hver enkelt download i stedet for til sidst efter alle
+   - Retry-strategi med eksponentiel backoff
+   - Mulighed for at genoptage afbrudte downloads
+   - Logging via ILogger i stedet for Console.WriteLine
