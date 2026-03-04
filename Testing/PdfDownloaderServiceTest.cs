@@ -52,10 +52,12 @@ namespace Testing
             var service = new PdfDownloaderService(httpClient);
 
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            int maxParallel = 8;
+
             Directory.CreateDirectory(tempFolder);
 
             // Act
-            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder);
+            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder, maxParallel);
 
             // Assert
             Assert.Equal(StatusMessage.Downloaded, report.Status);
@@ -94,10 +96,11 @@ namespace Testing
 
             var service = new PdfDownloaderService(httpClient);
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            int maxParallel = 8;
             Directory.CreateDirectory(tempFolder);
 
             // Act
-            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder);
+            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder, maxParallel);
 
             // Assert
             Assert.Equal(StatusMessage.Downloaded, report.Status);
@@ -124,10 +127,11 @@ namespace Testing
 
             var service = new PdfDownloaderService(httpClient);
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            int maxParallel = 8;
             Directory.CreateDirectory(tempFolder);
 
             // Act
-            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder);
+            await service.DownloadReportsAsync(new List<Report> { report }, tempFolder, maxParallel);
 
             // Assert
             Assert.Equal(StatusMessage.Failed, report.Status);

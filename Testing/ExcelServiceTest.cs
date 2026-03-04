@@ -84,7 +84,7 @@ namespace BusinessLogicLayer.Tests
             var service = new ExcelService();
 
             // Act
-            var reports = service.ReadReports(stream, "A", "B", "C", "D");
+            var reports = service.ReadReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
 
             // Assert
             Assert.Equal(2, reports.Count);
@@ -127,7 +127,7 @@ namespace BusinessLogicLayer.Tests
             var service = new ExcelService();
 
             // Act
-            var reports = service.ReadFirstTwoHundredReports(stream, "A", "B", "C", "D");
+            var reports = service.ReadFirstTwoHundredReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
 
             // Assert
             Assert.Equal(200, reports.Count);
@@ -213,7 +213,7 @@ namespace BusinessLogicLayer.Tests
             stream.Position = 0;
             var service = new ExcelService();
 
-            bool result = service.ValidateColumns(stream, "A", "B");
+            bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
             Assert.True(result);
         }
 
@@ -235,7 +235,7 @@ namespace BusinessLogicLayer.Tests
             stream.Position = 0;
             var service = new ExcelService();
 
-            bool result = service.ValidateColumns(stream, "A", "B");
+            bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
             Assert.False(result);
         }
 
