@@ -213,7 +213,7 @@ namespace BusinessLogicLayer.Tests
             stream.Position = 0;
             ExcelService service = new ExcelService();
 
-            bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
+            bool result = service.ValidateColumnsHasData(stream, "BRNumber", "PrimaryUrl");
             Assert.True(result);
         }
 
@@ -235,7 +235,7 @@ namespace BusinessLogicLayer.Tests
             stream.Position = 0;
             ExcelService service = new ExcelService();
 
-            bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
+            bool result = service.ValidateColumnsHasData(stream, "BRNumber", "PrimaryUrl");
             Assert.False(result);
         }
 

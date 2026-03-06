@@ -56,7 +56,7 @@ if (!es.ValidateOutputFile(excelOutputPath))
 // Valider at nødvendige kolonner findes og har data
 // ------------------------------------------------------------
 string[] requiredColumns = { idColumn, primaryColumn, fallbackColumn };
-if (!es.ValidateColumns(excelInputPath, requiredColumns))
+if (!es.ValidateColumnsHasData(excelInputPath, requiredColumns))
 {
     Console.WriteLine("Input Excel mangler en eller flere nødvendige kolonner.");
     return;

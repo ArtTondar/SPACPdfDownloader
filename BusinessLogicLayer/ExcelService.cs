@@ -274,17 +274,17 @@ namespace BusinessLogicLayer
         /// <summary>
         /// Validerer at angivne kolonner har data i Excel-filen (header-navne i stedet for bogstaver).
         /// </summary>
-        public bool ValidateColumns(string excelFilePath, params string[] columns)
+        public bool ValidateColumnsHasData(string excelFilePath, params string[] columns)
         {
             using FileStream stream = File.OpenRead(excelFilePath);
-            return ValidateColumns(stream, columns);
+            return ValidateColumnsHasData(stream, columns);
         }
 
         /// <summary>
         /// Validerer at angivne kolonner har data i Excel-stream.
         /// Finder kolonneindeks dynamisk ud fra header-navn.
         /// </summary>
-        public bool ValidateColumns(Stream excelStream, params string[] headerNames)
+        public bool ValidateColumnsHasData(Stream excelStream, params string[] headerNames)
         {
             using XLWorkbook workbook = new XLWorkbook(excelStream);
             IXLWorksheet sheet = workbook.Worksheet(1);
