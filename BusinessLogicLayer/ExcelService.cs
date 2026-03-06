@@ -27,10 +27,10 @@ namespace BusinessLogicLayer
         /// </summary>
         private int? GetColumnIndexByHeader(IXLWorksheet sheet, string headerName)
         {
-            var headerRow = sheet.Row(1);
+            IXLRow headerRow = sheet.Row(1);
 
             // Loop gennem alle brugte celler i header-rækken for at finde kolonne
-            foreach (var cell in headerRow.CellsUsed())
+            foreach (IXLCell? cell in headerRow.CellsUsed())
             {
                 // Trim og ignore case for at være robust overfor ekstra whitespace eller små/big letters
                 if (cell.GetString().Trim().Equals(headerName, StringComparison.OrdinalIgnoreCase))
@@ -45,20 +45,20 @@ namespace BusinessLogicLayer
         /// <summary>
         /// Læser de første 200 rapporter fra en Excel-fil på disk.
         /// </summary>
-        public List<Report> ReadFirstTwoHundredReports(string excelFilePath, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
+        public List<Report> ReadFirstFiftyReports(string excelFilePath, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
-            using var stream = File.OpenRead(excelFilePath);
-            return ReadFirstTwoHundredReports(stream, idColumnName, primaryColumnName, fallbackColumnName, yearColumnName);
+            using FileStream stream = File.OpenRead(excelFilePath);
+            return ReadFirstFiftyReports(stream, idColumnName, primaryColumnName, fallbackColumnName, yearColumnName);
         }
 
         /// <summary>
         /// Læser de første 200 rapporter fra et Excel-stream.
         /// </summary>
-        public List<Report> ReadFirstTwoHundredReports(Stream excelStream, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
+        public List<Report> ReadFirstFiftyReports(Stream excelStream, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             List<Report> reportList = new List<Report>();
-            using var workbook = new XLWorkbook(excelStream);
-            var sheet = workbook.Worksheet(1);
+            using XLWorkbook workbook = new XLWorkbook(excelStream);
+            IXLWorksheet sheet = workbook.Worksheet(1);
 
             // Find kolonneindeks dynamisk ud fra header-navne i stedet for hardcodede bogstaver
             int? idCol = GetColumnIndexByHeader(sheet, idColumnName);
@@ -73,7 +73,7 @@ namespace BusinessLogicLayer
             int count = 0;
 
             // Loop gennem alle brugte rækker i arket, spring header-række over
-            foreach (var row in sheet.RowsUsed().Skip(1))
+            foreach (IXLRow? row in sheet.RowsUsed().Skip(1))
             {
                 string brNumber = row.Cell(idCol.Value).GetString();
                 string primaryUrl = row.Cell(primaryCol.Value).GetString();
@@ -94,7 +94,7 @@ namespace BusinessLogicLayer
                 });
 
                 count++;
-                if (count >= 200) break; // Stop efter 200 for prototype
+                if (count >= 50) break; // Stop efter 50 for prototype
             }
 
             return reportList;
@@ -105,7 +105,7 @@ namespace BusinessLogicLayer
         /// </summary>
         public List<Report> ReadReports(string excelFilePath, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
-            using var stream = File.OpenRead(excelFilePath);
+            using FileStream stream = File.OpenRead(excelFilePath);
             return ReadReports(stream, idColumnName, primaryColumnName, fallbackColumnName, yearColumnName);
         }
 
@@ -115,8 +115,8 @@ namespace BusinessLogicLayer
         public List<Report> ReadReports(Stream excelStream, string idColumnName, string primaryColumnName, string fallbackColumnName, string yearColumnName)
         {
             List<Report> reportList = new List<Report>();
-            using var workbook = new XLWorkbook(excelStream);
-            var sheet = workbook.Worksheet(1);
+            using XLWorkbook workbook = new XLWorkbook(excelStream);
+            IXLWorksheet sheet = workbook.Worksheet(1);
 
             // Find kolonneindeks dynamisk ud fra header-navne
             int? idCol = GetColumnIndexByHeader(sheet, idColumnName);
@@ -128,7 +128,7 @@ namespace BusinessLogicLayer
             if (!idCol.HasValue || !primaryCol.HasValue || !fallbackCol.HasValue)
                 throw new Exception("En af de nødvendige kolonner findes ikke i inputfilen.");
 
-            foreach (var row in sheet.RowsUsed().Skip(1))
+            foreach (IXLRow? row in sheet.RowsUsed().Skip(1))
             {
                 string brNumber = row.Cell(idCol.Value).GetString();
                 string primaryUrl = row.Cell(primaryCol.Value).GetString();
@@ -155,7 +155,7 @@ namespace BusinessLogicLayer
         /// </summary>
         public void WriteReports(List<Report> reports, string outputPath)
         {
-            using var stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+            using FileStream stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
             WriteReports(reports, stream);
         }
 
@@ -164,8 +164,8 @@ namespace BusinessLogicLayer
         /// </summary>
         public void WriteReports(List<Report> reports, Stream stream)
         {
-            using var workbook = new XLWorkbook();
-            var sheet = workbook.Worksheets.Add("Reports");
+            using XLWorkbook workbook = new XLWorkbook();
+            IXLWorksheet sheet = workbook.Worksheets.Add("Reports");
 
             // Opret header-række
             sheet.Cell(1, 1).Value = "BRNumber";
@@ -178,7 +178,7 @@ namespace BusinessLogicLayer
 
             int row = 2;
 
-            foreach (var report in reports)
+            foreach (Report report in reports)
             {
                 // Skriv data-rækker
                 sheet.Cell(row, 1).Value = report.BRNumber;
@@ -242,7 +242,7 @@ namespace BusinessLogicLayer
         {
             try
             {
-                using (var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 {
                     return false;
                 }
@@ -260,7 +260,7 @@ namespace BusinessLogicLayer
         {
             try
             {
-                using (var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+                using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
                 {
                     return true;
                 }
@@ -276,7 +276,7 @@ namespace BusinessLogicLayer
         /// </summary>
         public bool ValidateColumns(string excelFilePath, params string[] columns)
         {
-            using var stream = File.OpenRead(excelFilePath);
+            using FileStream stream = File.OpenRead(excelFilePath);
             return ValidateColumns(stream, columns);
         }
 
@@ -286,15 +286,15 @@ namespace BusinessLogicLayer
         /// </summary>
         public bool ValidateColumns(Stream excelStream, params string[] headerNames)
         {
-            using var workbook = new XLWorkbook(excelStream);
-            var sheet = workbook.Worksheet(1);
+            using XLWorkbook workbook = new XLWorkbook(excelStream);
+            IXLWorksheet sheet = workbook.Worksheet(1);
 
-            var headerRow = sheet.Row(1);
+            IXLRow headerRow = sheet.Row(1);
 
-            foreach (var headerName in headerNames)
+            foreach (string headerName in headerNames)
             {
                 // Find kolonne ud fra header-navn
-                var cell = headerRow.CellsUsed()
+                IXLCell? cell = headerRow.CellsUsed()
                     .FirstOrDefault(c => c.GetString().Trim().Equals(headerName, StringComparison.OrdinalIgnoreCase));
 
                 if (cell == null)

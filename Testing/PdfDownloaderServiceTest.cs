@@ -10,7 +10,7 @@ namespace Testing
     {
         private HttpClient CreateMockHttpClient(Func<HttpRequestMessage, HttpResponseMessage> sendAsyncFunc)
         {
-            var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            Mock<HttpMessageHandler> handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
 
             handlerMock
                .Protected()
@@ -31,14 +31,14 @@ namespace Testing
         public async Task DownloadReportsAsync_SuccessfulDownload_SetsReportProperties()
         {
             // Arrange
-            var report = new Report
+            Report report = new Report
             {
                 BRNumber = "123",
                 Year = 2025,
                 PrimaryUrl = "http://example.com/file.pdf"
             };
 
-            var httpClient = CreateMockHttpClient(req =>
+            HttpClient httpClient = CreateMockHttpClient(req =>
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
@@ -49,7 +49,7 @@ namespace Testing
                 };
             });
 
-            var service = new PdfDownloaderService(httpClient);
+            PdfDownloaderService service = new PdfDownloaderService(httpClient);
 
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             int maxParallel = 8;
@@ -70,7 +70,7 @@ namespace Testing
         public async Task DownloadReportsAsync_FallbackUrlUsed_WhenPrimaryFails()
         {
             // Arrange
-            var report = new Report
+            Report report = new Report
             {
                 BRNumber = "456",
                 Year = 2025,
@@ -78,7 +78,7 @@ namespace Testing
                 FallbackUrl = "http://example.com/success.pdf"
             };
 
-            var httpClient = CreateMockHttpClient(req =>
+            HttpClient httpClient = CreateMockHttpClient(req =>
             {
                 if (req.RequestUri!.ToString().Contains("fail"))
                 {
@@ -94,7 +94,7 @@ namespace Testing
                 };
             });
 
-            var service = new PdfDownloaderService(httpClient);
+            PdfDownloaderService service = new PdfDownloaderService(httpClient);
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             int maxParallel = 8;
             Directory.CreateDirectory(tempFolder);
@@ -112,7 +112,7 @@ namespace Testing
         public async Task DownloadReportsAsync_AllUrlsFail_SetsFailedStatus()
         {
             // Arrange
-            var report = new Report
+            Report report = new Report
             {
                 BRNumber = "789",
                 Year = 2025,
@@ -120,12 +120,12 @@ namespace Testing
                 FallbackUrl = "http://example.com/fail2.pdf"
             };
 
-            var httpClient = CreateMockHttpClient(req =>
+            HttpClient httpClient = CreateMockHttpClient(req =>
             {
                 return new HttpResponseMessage(HttpStatusCode.InternalServerError);
             });
 
-            var service = new PdfDownloaderService(httpClient);
+            PdfDownloaderService service = new PdfDownloaderService(httpClient);
             string tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             int maxParallel = 8;
             Directory.CreateDirectory(tempFolder);

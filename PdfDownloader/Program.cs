@@ -67,7 +67,7 @@ if (!es.ValidateColumns(excelInputPath, requiredColumns))
 // ------------------------------------------------------------
 // Læs kun de første 200 rapporter i prototypen
 // Dette kan senere ændres til at læse alle (ReadReports)
-List<Report> reports = es.ReadFirstTwoHundredReports(
+List<Report> reports = es.ReadFirstFiftyReports(
     excelInputPath,
     idColumn,
     primaryColumn,

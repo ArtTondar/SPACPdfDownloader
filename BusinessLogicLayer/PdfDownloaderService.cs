@@ -45,7 +45,7 @@ public class PdfDownloaderService
         Directory.CreateDirectory(outputFolder);
 
         // Semaphore bruges til at begrænse antal samtidige downloads
-        var semaphore = new SemaphoreSlim(maxParallel);
+        SemaphoreSlim semaphore = new SemaphoreSlim(maxParallel);
 
         // Tællere opdateres trådsikkert via Interlocked
         int processed = 0; // Antal færdigbehandlede rapporter (success + failed)
@@ -53,17 +53,17 @@ public class PdfDownloaderService
         int failed = 0;    // Antal fejlede downloads
 
         // Stopwatch måler samlet køretid for hele batchen
-        var totalStopwatch = Stopwatch.StartNew();
+        Stopwatch totalStopwatch = Stopwatch.StartNew();
 
         // CancellationToken bruges til at stoppe heartbeat-timeren,
         // når alle downloads er færdige
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new CancellationTokenSource();
 
         // Starter en baggrundsopgave, der logger fremdrift periodisk
-        var heartbeatTask = Task.Run(async () =>
+        Task heartbeatTask = Task.Run(async () =>
         {
             // PeriodicTimer udløses hvert 3. sekund
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
 
             try
             {
@@ -95,7 +95,7 @@ public class PdfDownloaderService
         });
 
         // Opretter en asynkron opgave pr. rapport
-        var downloadTasks = reports.Select(async report =>
+        IEnumerable<Task> downloadTasks = reports.Select(async report =>
         {
             // Vent hvis maks. antal samtidige downloads er nået
             await semaphore.WaitAsync();
@@ -142,11 +142,11 @@ public class PdfDownloaderService
     /// <returns>True hvis download lykkedes, ellers false.</returns>
     private async Task<bool> ProcessSingleReportAsync(Report report, string outputFolder)
     {
-        var sw = Stopwatch.StartNew(); // Start tidtagning
+        Stopwatch sw = Stopwatch.StartNew(); // Start tidtagning
 
-        var urls = new[] { report.PrimaryUrl, report.FallbackUrl };
+        string?[] urls = new[] { report.PrimaryUrl, report.FallbackUrl };
 
-        var fileBytes = await TryDownloadFromUrlsAsync(urls);
+        byte[]? fileBytes = await TryDownloadFromUrlsAsync(urls);
 
         sw.Stop(); // Stop tidtagning
 
@@ -174,7 +174,7 @@ public class PdfDownloaderService
     /// <returns>Byte-array med PDF-indhold, eller null hvis ingen URL virkede.</returns>
     private async Task<byte[]?> TryDownloadFromUrlsAsync(IEnumerable<string> urls)
     {
-        foreach (var url in urls.Where(u => !string.IsNullOrWhiteSpace(u)))
+        foreach (string? url in urls.Where(u => !string.IsNullOrWhiteSpace(u)))
         {
             try
             {
@@ -197,10 +197,10 @@ public class PdfDownloaderService
     /// <exception cref="Exception">Hvis filen ikke er en PDF eller HTTP-status fejler.</exception>
     private async Task<byte[]> DownloadPdfAsync(string url)
     {
-        using var response = await _httpClient.GetAsync(url);
+        using HttpResponseMessage response = await _httpClient.GetAsync(url);
         response.EnsureSuccessStatusCode(); // Kaster hvis HTTP-fejl
 
-        var contentType = response.Content.Headers.ContentType?.MediaType;
+        string? contentType = response.Content.Headers.ContentType?.MediaType;
 
         if (contentType == null || !contentType.Contains("pdf"))
             throw new Exception("Not a PDF");

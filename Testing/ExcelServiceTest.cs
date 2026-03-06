@@ -15,7 +15,7 @@ namespace BusinessLogicLayer.Tests
 
         public void Dispose()
         {
-            foreach (var file in _tempFiles)
+            foreach (string file in _tempFiles)
             {
                 try { File.Delete(file); } catch { }
             }
@@ -26,21 +26,21 @@ namespace BusinessLogicLayer.Tests
         [Fact]
         public void WriteReports_CreatesValidExcel()
         {
-            var reports = new List<Report>
+            List<Report> reports = new List<Report>
     {
         new Report { BRNumber = "BR1", PrimaryUrl = "http://a", FallbackUrl = "http://b", Year = 2024, Status = StatusMessage.NotDownloaded },
         new Report { BRNumber = "BR2", PrimaryUrl = "http://c", FallbackUrl = null, Year = 2023, Status = StatusMessage.NotDownloaded }
     };
 
-            var service = new ExcelService();
-            using var stream = new MemoryStream();
+            ExcelService service = new ExcelService();
+            using MemoryStream stream = new MemoryStream();
 
             service.WriteReports(reports, stream);
 
             stream.Position = 0; // vigtigt!
 
-            using var workbook = new XLWorkbook(stream);
-            var sheet = workbook.Worksheet(1);
+            using XLWorkbook workbook = new XLWorkbook(stream);
+            IXLWorksheet sheet = workbook.Worksheet(1);
 
             // Læs de kolonner, som faktisk er i WriteReports
             Assert.Equal("BR1", sheet.Cell(2, 1).GetString());      // BRNumber
@@ -58,10 +58,10 @@ namespace BusinessLogicLayer.Tests
         public void ReadReports_ReadsCorrectly()
         {
             // Arrange
-            using var stream = new MemoryStream();
-            using (var workbook = new XLWorkbook())
+            using MemoryStream stream = new MemoryStream();
+            using (XLWorkbook workbook = new XLWorkbook())
             {
-                var sheet = workbook.Worksheets.Add("Reports");
+                IXLWorksheet sheet = workbook.Worksheets.Add("Reports");
                 sheet.Cell(1, 1).Value = "BRNumber";
                 sheet.Cell(1, 2).Value = "PrimaryUrl";
                 sheet.Cell(1, 3).Value = "FallbackUrl";
@@ -81,10 +81,10 @@ namespace BusinessLogicLayer.Tests
             }
 
             stream.Position = 0;
-            var service = new ExcelService();
+            ExcelService service = new ExcelService();
 
             // Act
-            var reports = service.ReadReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
+            List<Report> reports = service.ReadReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
 
             // Assert
             Assert.Equal(2, reports.Count);
@@ -100,13 +100,13 @@ namespace BusinessLogicLayer.Tests
         }
 
         [Fact]
-        public void ReadFirstTwoHundredReports_LimitsTo200()
+        public void ReadFirstFiftyReports_LimitsTo50()
         {
             // Arrange
-            using var stream = new MemoryStream();
-            using (var workbook = new XLWorkbook())
+            using MemoryStream stream = new MemoryStream();
+            using (XLWorkbook workbook = new XLWorkbook())
             {
-                var sheet = workbook.Worksheets.Add("Reports");
+                IXLWorksheet sheet = workbook.Worksheets.Add("Reports");
                 sheet.Cell(1, 1).Value = "BRNumber";
                 sheet.Cell(1, 2).Value = "PrimaryUrl";
                 sheet.Cell(1, 3).Value = "FallbackUrl";
@@ -124,15 +124,15 @@ namespace BusinessLogicLayer.Tests
             }
 
             stream.Position = 0;
-            var service = new ExcelService();
+            ExcelService service = new ExcelService();
 
             // Act
-            var reports = service.ReadFirstTwoHundredReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
+            List<Report> reports = service.ReadFirstFiftyReports(stream, "BRNumber", "PrimaryUrl", "FallbackUrl", "Year");
 
             // Assert
-            Assert.Equal(200, reports.Count);
+            Assert.Equal(50, reports.Count);
             Assert.Equal("BR1", reports[0].BRNumber);
-            Assert.Equal("BR200", reports[199].BRNumber);
+            Assert.Equal("BR50", reports[49].BRNumber);
         }
 
         #endregion
@@ -198,10 +198,10 @@ namespace BusinessLogicLayer.Tests
         [Fact]
         public void ValidateColumns_ReturnsTrue_WhenColumnsHaveData()
         {
-            using var stream = new MemoryStream();
-            using (var workbook = new XLWorkbook())
+            using MemoryStream stream = new MemoryStream();
+            using (XLWorkbook workbook = new XLWorkbook())
             {
-                var sheet = workbook.Worksheets.Add("Reports");
+                IXLWorksheet sheet = workbook.Worksheets.Add("Reports");
                 sheet.Cell(1, 1).Value = "BRNumber";
                 sheet.Cell(1, 2).Value = "PrimaryUrl";
                 sheet.Cell(2, 1).Value = "BR1";
@@ -211,7 +211,7 @@ namespace BusinessLogicLayer.Tests
             }
 
             stream.Position = 0;
-            var service = new ExcelService();
+            ExcelService service = new ExcelService();
 
             bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
             Assert.True(result);
@@ -220,10 +220,10 @@ namespace BusinessLogicLayer.Tests
         [Fact]
         public void ValidateColumns_ReturnsFalse_WhenColumnEmpty()
         {
-            using var stream = new MemoryStream();
-            using (var workbook = new XLWorkbook())
+            using MemoryStream stream = new MemoryStream();
+            using (XLWorkbook workbook = new XLWorkbook())
             {
-                var sheet = workbook.Worksheets.Add("Reports");
+                IXLWorksheet sheet = workbook.Worksheets.Add("Reports");
                 sheet.Cell(1, 1).Value = "BRNumber";
                 sheet.Cell(1, 2).Value = "PrimaryUrl";
                 sheet.Cell(2, 1).Value = "";
@@ -233,7 +233,7 @@ namespace BusinessLogicLayer.Tests
             }
 
             stream.Position = 0;
-            var service = new ExcelService();
+            ExcelService service = new ExcelService();
 
             bool result = service.ValidateColumns(stream, "BRNumber", "PrimaryUrl");
             Assert.False(result);
